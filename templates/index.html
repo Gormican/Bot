@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Personal Agent</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 840px; margin: 2rem auto; padding: 0 1rem; }
+    h2 { margin-top: 2rem; }
+    .row { display: flex; gap: .5rem; margin-bottom: .5rem; }
+    input[type="text"], input[type="url"] { flex: 1; padding: .5rem; }
+    button { padding: .5rem .75rem; }
+    .pill { display:inline-flex; align-items:center; gap:.5rem; background:#eee; border-radius:999px; padding:.25rem .5rem; margin:.25rem .25rem .25rem 0; }
+    .pill button { border:none; background:transparent; cursor:pointer; }
+    #status { font-size:.9rem; color:#666; margin-top:.25rem; }
+    textarea { width:100%; min-height: 90px; }
+    pre { background:#f7f7f7; padding:.5rem; overflow:auto; }
+  </style>
+</head>
+<body>
+  <h1>Personal Agent</h1>
+
+  <h2>Current Topics</h2>
+  <div id="topics"></div>
+  <div class="row">
+    <input id="newTopic" type="text" placeholder="Add a topic (e.g., Padres or Taylor Swift)" />
+    <button id="addTopic">Add</button>
+  </div>
+
+  <h2>Home</h2>
+  <div class="row"><input id="zipcode" type="text" placeholder="ZIP code (US)" /></div>
+  <div class="row">
+    <input id="lat" type="text" placeholder="Latitude (optional if ZIP set)" />
+    <input id="lon" type="text" placeholder="Longitude (optional if ZIP set)" />
+    <input id="tz"  type="text" placeholder="Timezone (e.g., America/Los_Angeles)" />
+    <button id="saveHome">Save home</button>
+  </div>
+  <div id="homeStatus"></div>
+
+  <h2>Calendar</h2>
+  <div class="row">
+    <input id="ics" type="url" placeholder="Secret ICS URL from your calendar" />
+    <button id="saveCal">Save calendar</button>
+  </div>
+  <div id="calStatus"></div>
+
+  <h2>Morning report</h2>
+  <div class="row">
+    <button id="getReport">Show</button>
+    <button id="speakReport">Speak</button>
+  </div>
+  <pre id="reportOut"></pre>
+  <audio id="audio" controls style="display:none"></audio>
+
+  <h2>Study helper</h2>
+  <textarea id="question" placeholder="Ask a study question..."></textarea>
+  <div class="row"><button id="ask">Ask</button></div>
+  <pre id="answer"></pre>
+
+  <script>
+    const api = (p, opt={}) => fetch(p, {headers:{'Content-Type':'application/json'}, ...opt});
+
+    function pill(text, onX) {
+      const el = document.createElement('span');
+      el.className = 'pill';
+      el.textContent = text + ' ';
+      const b = document.createElement('button');
+      b.textContent = '×';
+      b.onclick = onX;
+      el.appendChild(b);
+      return el;
+    }
+
+    async function loadTopics() {
+      const r = await api('/prefs/news');
+      const j = await r.json();
+      const box = document.getElementById('topics');
+      box.innerHTML = '';
+      (j.topics || []).forEach(t => box.appendChild(pill(t, () => removeTopic(t))));
+    }
+
+    async function addTopic() {
+      const v = document.getElementById('newTopic').value.trim();
+      if (!v) return;
+      await api('/prefs/news', {method:'POST', body: JSON.stringify({topics:[v]})});
+      document.getElementById('newTopic').value = '';
+      loadTopics();
+    }
+
+    async function removeTopic(t){
+      await api('/prefs/news/'+encodeURIComponent(t), {method:'DELETE'});
+      loadTopics();
+    }
+
+    async function saveHome(){
+      const zipcode = document.getElementById('zipcode').value.trim() || null;
+      const lat = document.getElementById('lat').value.trim() || null;
+      const lon = document.getElementById('lon').value.trim() || null;
+      const tz  = document.getElementById('tz').value.trim()  || null;
+      const body = {zipcode, lat: lat?Number(lat):null, lon: lon?Number(lon):null, tz};
+      const r = await api('/prefs/home', {method:'POST', body: JSON.stringify(body)});
+      const j = await r.json();
+      document.getElementById('homeStatus').textContent = r.ok ? 'Saved.' : ('Save failed: '+JSON.stringify(j));
+    }
+
+    async function saveCal(){
+      const v = document.getElementById('ics').value.trim();
+      const r = await api('/prefs/calendar', {method:'POST', body: JSON.stringify({ics:v})});
+      const j = await r.json();
+      document.getElementById('calStatus').textContent = r.ok ? 'Saved.' : ('Save failed: '+JSON.stringify(j));
+    }
+
+    async function getReport(){
+      const r = await api('/report/morning');
+      const j = await r.json();
+      document.getElementById('reportOut').textContent = r.ok ? j.text : ('Error: '+JSON.stringify(j));
+    }
+
+    async function speakReport(){
+      const r = await fetch('/report/morning/speak');
+      if(!r.ok){ const j = await r.json(); document.getElementById('reportOut').textContent = 'Audio error: '+JSON.stringify(j); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = document.getElementById('audio');
+      audio.src = url;
+      audio.style.display = 'block';
+      audio.play();
+    }
+
+    document.getElementById('addTopic').onclick = addTopic;
+    document.getElementById('saveHome').onclick = saveHome;
+    document.getElementById('saveCal').onclick = saveCal;
+    document.getElementById('getReport').onclick = getReport;
+    document.getElementById('speakReport').onclick = speakReport;
+    document.getElementById('ask').onclick = async ()=>{
+      const q = document.getElementById('question').value.trim();
+      if(!q) return;
+      const r = await api('/study/ask', {method:'POST', body: JSON.stringify({question:q})});
+      const j = await r.json();
+      document.getElementById('answer').textContent = r.ok ? j.answer : ('Error: '+JSON.stringify(j));
+    };
+
+    loadTopics();
+  </script>
+</body>
+</html>

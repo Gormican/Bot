@@ -1,0 +1,16 @@
+{
+  "news": {
+    "topics": [
+      "Tesla"
+    ]
+  },
+  "home": {
+    "lat": null,
+    "lon": null,
+    "tz": "America/Los_Angeles",
+    "zipcode": "92118"
+  },
+  "calendar": {
+    "ics": null
+  }
+}
