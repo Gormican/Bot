@@ -1,24 +1,33 @@
-from fastapi import FastAPI
+# app/main.py
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-
-from app.routers.prefs import router as prefs_router
-from app.routers.study import router as study_router
-from app.routers.report import router as report_router
-from app.routers.default import router as default_router
+from pydantic import BaseModel
+import os
 
 app = FastAPI(title="Personal Agent")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],   # TODO: tighten to your Render domain later
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
 
-app.include_router(prefs_router)
-app.include_router(study_router)
-app.include_router(report_router)
-app.include_router(default_router)
+@app.get("/version")
+def version():
+    return {"version": os.getenv("GIT_SHA", "dev")}
+
+class ChatIn(BaseModel):
+    message: str
+
+@app.post("/api/chat")
+def chat(inp: ChatIn):
+    msg = inp.message.strip()
+    if not msg:
+        raise HTTPException(400, "message is required")
+    # TODO: swap this for a real OpenAI call
+    return {"reply": f"You said: {msg}"}
