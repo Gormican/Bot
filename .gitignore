@@ -1,15 +1,8 @@
-# Python
+﻿# Python
 .venv/
 __pycache__/
 *.pyc
 
-# Env & OS junk
+# Env
 .env
 .env.*
-.DS_Store
-Thumbs.db
-
-# Build / logs
-dist/
-build/
-*.log
